@@ -4,6 +4,8 @@ import json
 from config import email, password, server
 from pprint import pprint
 from datetime import datetime, timezone
+from time import sleep
+from sys import exit
 
 # Only list user who are offline for more than LIMIT days
 LIMIT = 30
@@ -13,11 +15,12 @@ def login():
     url = "{}/api/v1/login".format(server)
     r = requests.post(url, data=json.dumps(p))
     if r.status_code == 200:
+        print("Login successful")
         data = r.json()
         return {"X-Auth-Token": data["data"]["authToken"], "X-User-Id": data["data"]["userId"]}
     else:
         print(r.json())
-        return None
+        exit()
 
 
 def get_active_user(auth_header):
@@ -25,9 +28,11 @@ def get_active_user(auth_header):
     r = requests.get(url, headers=auth_header)
     if r.status_code == 200:
         # Only return active user
+        print("Found {} user on your server".format(len(r.json()["users"])))
         return [u for u in r.json()["users"] if u["active"]]
     else:
-        return None
+        print(r.json())
+        exit()
 
 
 def get_user_info(user_list, auth_header):
@@ -37,7 +42,12 @@ def get_user_info(user_list, auth_header):
     for user in user_list:
         params = {"userId": user["_id"]}
         r = requests.get(url, params=params, headers=auth_header)
-        response = r.json()["user"]
+        sleep(5) # beware of rate-limiting
+        try:
+            response = r.json()["user"]
+        except KeyError:
+            print(r.json())
+            continue
 
         try:
             tmp = {"name": response["username"], "lastLogin": response["lastLogin"]}
@@ -54,9 +64,11 @@ if __name__ == "__main__":
     auth_header = login()
     if auth_header:
         user_list = get_active_user(auth_header)
-        user_info = get_user_info(user_list, auth_header)
-        user_info.sort(key=lambda item:item["lastLogin"], reverse=True)
-        for u in user_info:
-            print("{:<20} - {}".format(u["name"], u["lastLogin"]))
+        print("{} of them are active".format(len(user_list)))
+        if len(user_list) > 0:
+            user_info = get_user_info(user_list, auth_header)
+            user_info.sort(key=lambda item:item["lastLogin"], reverse=True)
+            for u in user_info:
+                print("{:<20} - {}".format(u["name"], u["lastLogin"]))
     else:
         print("Login failed")
