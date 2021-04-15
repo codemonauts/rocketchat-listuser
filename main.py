@@ -1,14 +1,12 @@
 #! /usr/bin/env pyhon3
 import requests
 import json
-from config import email, password, server
+from config import email, password, server, limit
 from pprint import pprint
 from datetime import datetime, timezone
 from time import sleep
 from sys import exit
-
-# Only list user who are offline for more than LIMIT days
-LIMIT = 30
+from progressbar import progressbar
 
 
 def login():
@@ -40,10 +38,10 @@ def get_user_info(user_list, auth_header):
     url = "{}/api/v1/users.info".format(server)
     data = []
     now = datetime.now(timezone.utc)
-    for user in user_list:
+    for user in progressbar(user_list):
         params = {"userId": user["_id"]}
         r = requests.get(url, params=params, headers=auth_header)
-        sleep(5)  # beware of rate-limiting
+        sleep(1)  # beware of rate-limiting
         try:
             response = r.json()["user"]
         except KeyError:
@@ -53,10 +51,11 @@ def get_user_info(user_list, auth_header):
         try:
             tmp = {"name": response["username"], "lastLogin": response["lastLogin"]}
         except KeyError:
+            # new user have no "lastLogin" field before their first login, so we use the creation date
             tmp = {"name": response["username"], "lastLogin": response["createdAt"]}
 
         diff = abs(datetime.strptime(tmp["lastLogin"], "%Y-%m-%dT%H:%M:%S.%f%z") - now).days
-        if diff >= LIMIT:
+        if diff >= limit:
             data.append(tmp)
 
     return data

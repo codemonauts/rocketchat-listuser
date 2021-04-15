@@ -1,3 +1,6 @@
 email = "johndoe@gmail.com"
 password = "topsecret"
 server = "https://company.rocket.chat"
+
+# Only list account who haven't logged in for so many days
+limit = 30
