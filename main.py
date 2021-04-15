@@ -10,6 +10,7 @@ from sys import exit
 # Only list user who are offline for more than LIMIT days
 LIMIT = 30
 
+
 def login():
     p = {"user": email, "password": password}
     url = "{}/api/v1/login".format(server)
@@ -42,7 +43,7 @@ def get_user_info(user_list, auth_header):
     for user in user_list:
         params = {"userId": user["_id"]}
         r = requests.get(url, params=params, headers=auth_header)
-        sleep(5) # beware of rate-limiting
+        sleep(5)  # beware of rate-limiting
         try:
             response = r.json()["user"]
         except KeyError:
@@ -60,6 +61,7 @@ def get_user_info(user_list, auth_header):
 
     return data
 
+
 if __name__ == "__main__":
     auth_header = login()
     if auth_header:
@@ -67,7 +69,7 @@ if __name__ == "__main__":
         print("{} of them are active".format(len(user_list)))
         if len(user_list) > 0:
             user_info = get_user_info(user_list, auth_header)
-            user_info.sort(key=lambda item:item["lastLogin"], reverse=True)
+            user_info.sort(key=lambda item: item["lastLogin"], reverse=True)
             for u in user_info:
                 print("{:<20} - {}".format(u["name"], u["lastLogin"]))
     else:
