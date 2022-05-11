@@ -1,37 +1,39 @@
 #! /usr/bin/env pyhon3
 import requests
-import json
-from config import email, password, server, limit
-from pprint import pprint
+from config import token, user_id, server, limit
 from datetime import datetime, timezone
 from time import sleep
 from sys import exit
 from progressbar import progressbar
 
 
-def login():
-    p = {"user": email, "password": password}
-    url = "{}/api/v1/login".format(server)
-    r = requests.post(url, data=json.dumps(p))
-    if r.status_code == 200:
-        print("Login successful")
-        data = r.json()
-        return {"X-Auth-Token": data["data"]["authToken"], "X-User-Id": data["data"]["userId"]}
-    else:
-        print(r.json())
-        exit()
-
-
 def get_active_user(auth_header):
+    users = []
+    offset = 0
+    count = 100
+
     url = "{}/api/v1/users.list".format(server)
-    r = requests.get(url, headers=auth_header)
-    if r.status_code == 200:
-        # Only return active user
-        print("Found {} user on your server".format(len(r.json()["users"])))
-        return [u for u in r.json()["users"] if u["active"]]
-    else:
-        print(r.json())
-        exit()
+    while True:
+        r = requests.get(url,
+                headers=auth_header,
+                params = {"count":100,"offset": offset},
+                )
+
+        if r.status_code == 200:
+            resp = r.json()
+            users += resp["users"]
+            if count*offset < resp["total"]:
+                offset += count
+            else:
+                break
+        else:
+            print(r.json())
+            exit()
+   
+    active =  [u for u in users if u["active"]]
+    print(f"Active users: {len(active)} out of {len(users)}")
+    return active
+
 
 
 def get_user_info(user_list, auth_header):
@@ -60,16 +62,15 @@ def get_user_info(user_list, auth_header):
 
     return data
 
+def format_datetime(d):
+    return datetime.fromisoformat(d.strip("Z")).strftime("%d.%m.%Y")
 
 if __name__ == "__main__":
-    auth_header = login()
-    if auth_header:
-        user_list = get_active_user(auth_header)
-        print("{} of them are active".format(len(user_list)))
-        if len(user_list) > 0:
-            user_info = get_user_info(user_list, auth_header)
-            user_info.sort(key=lambda item: item["lastLogin"], reverse=True)
-            for u in user_info:
-                print("{:<20} - {}".format(u["name"], u["lastLogin"]))
-    else:
-        print("Login failed")
+    auth_header = {"X-Auth-Token": token, "X-User-Id": user_id}
+    user_list = get_active_user(auth_header)
+    print("{} of them are active".format(len(user_list)))
+    if len(user_list) > 0:
+        user_info = get_user_info(user_list, auth_header)
+        user_info.sort(key=lambda item: item["lastLogin"], reverse=True)
+        for u in user_info:
+            print("{:<20} - {}".format(u["name"], format_datetime(u["lastLogin"])))
